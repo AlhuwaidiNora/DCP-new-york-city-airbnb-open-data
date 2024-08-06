@@ -1,0 +1,59 @@
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
+# Reading the dataset into a DataFrame
+airbnb_df = pd.read_csv('data/airbnb_data.csv')
+
+airbnb_df.set_index('listing_id', inplace=True)
+
+percent_missing = airbnb_df.isnull().mean() * 100
+
+airbnb_df['reviews_per_month'].fillna(0, inplace=True)
+airbnb_df.dropna(subset=['host_name'], inplace=True)
+airbnb_df.dropna(subset=['last_review'], inplace=True)
+airbnb_df = airbnb_df[airbnb_df['host_id'] != 0]
+airbnb_df['last_review'] = pd.to_datetime(airbnb_df['last_review'])
+airbnb_df.drop_duplicates(subset=['listing_name', 'price', 'room_type'], keep='last', inplace=True)
+airbnb_df['price'] = airbnb_df['price'].str.replace('[\$,]', '').astype(float)
+
+airbnb_df[['neighbourhood', 'borough']] = airbnb_df['neighbourhood_group'].str.split(', ', expand=True)
+airbnb_df.drop(columns=['neighbourhood_group'], inplace=True)
+
+airbnb_df[['latitude', 'longitude']] = airbnb_df['lat_lon'].str.split(',', expand=True).astype(float)
+airbnb_df.drop(columns=['lat_lon'], inplace=True)
+
+longlat_min_max = (airbnb_df.longitude.min(), airbnb_df.longitude.max(), airbnb_df.latitude.min(), airbnb_df.latitude.max())
+nyc = plt.imread('./data/nyc-map.png')
+
+fig, ax = plt.subplots(figsize=(10, 9))
+ax.scatter(airbnb_df.longitude, airbnb_df.latitude, zorder=1, alpha=0.6, c='#fd5c63', s=10)
+ax.set_title('Airbnb listing locations')
+ax.imshow(nyc, extent=longlat_min_max)
+plt.show()
+
+airbnb_df['availability_365'] = pd.to_numeric(airbnb_df['availability_365'], errors='coerce')
+airbnb_df['availability_365'] = airbnb_df['availability_365'].abs()
+airbnb_df = airbnb_df[airbnb_df['availability_365'] <= 365]
+
+most_reviews = airbnb_df.groupby('host_name')['reviews_per_month'].sum().nlargest(10)
+
+most_reviews.plot(kind='pie', figsize=(8, 8))
+plt.title("Top 10 Most Reviews Per Month")
+plt.ylabel("")
+plt.show()
+expensive_listings_df = airbnb_df.nlargest(100, 'price')
+expensive_neighbourhoods = expensive_listings_df['neighbourhood'].value_counts()
+expensive_neighbourhoods.plot(kind='bar', figsize=(10, 7))
+plt.title('Neighbourhoods with the most expensive listings')
+plt.xlabel('Neighbourhood')
+plt.ylabel('Number of Listings')
+plt.show()
+top_neighbourhoods = airbnb_df['neighbourhood'].value_counts().head(10)
+top_neighbourhoods.plot(kind='bar', figsize=(10, 7))
+plt.title('Top 10 Neighbourhoods with the most listings')
+plt.xlabel('Neighbourhood')
+plt.ylabel('Number of Listings')
+plt.show()
